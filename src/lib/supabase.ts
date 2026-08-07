@@ -70,6 +70,7 @@ export interface EmpreendedorismoResposta {
   id?: string;
   email: string;
   nome_completo: string;
+  telefone?: string;
   area_atuacao_atual: string;
   aumento_ganhos_financeiros: string;
   areas_de_ganho: string[];
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS public.empreendedorismo_respostas (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   email TEXT NOT NULL,
   nome_completo TEXT NOT NULL,
+  telefone TEXT,
   area_atuacao_atual TEXT,
   aumento_ganhos_financeiros TEXT,
   areas_de_ganho TEXT[],

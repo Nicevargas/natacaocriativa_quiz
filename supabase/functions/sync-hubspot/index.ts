@@ -15,6 +15,7 @@ interface FormRecord {
   id: string;
   email: string;
   nome_completo: string;
+  telefone?: string;
   area_atuacao_atual?: string;
   aumento_ganhos_financeiros?: string;
   areas_de_ganho?: string[];
@@ -215,6 +216,7 @@ serve(async (req) => {
       email: record.email,
       firstname: firstname,
       lastname: lastname,
+      phone: record.telefone || '',
       area_atuacao_aquatica: record.area_atuacao_atual || '',
       aumento_ganhos_pos: record.aumento_ganhos_financeiros || '',
       areas_de_ganho_pos: formatArray(record.areas_de_ganho),

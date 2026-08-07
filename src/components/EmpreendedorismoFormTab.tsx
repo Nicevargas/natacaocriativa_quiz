@@ -7,6 +7,7 @@ import {
   ListFilter,
   User,
   Mail,
+  Phone,
   Briefcase,
   TrendingUp,
   DollarSign,
@@ -45,6 +46,7 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   // Form State
   const [email, setEmail] = useState('');
   const [nomeCompleto, setNomeCompleto] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [areaAtuacaoAtual, setAreaAtuacaoAtual] = useState('');
   const [aumentoGanhosFinanceiros, setAumentoGanhosFinanceiros] = useState('');
   const [areasDeGanho, setAreasDeGanho] = useState<string[]>([]);
@@ -221,6 +223,7 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
     const payload: Omit<EmpreendedorismoResposta, 'id' | 'created_at'> = {
       email: email.trim(),
       nome_completo: nomeCompleto.trim(),
+      telefone: telefone.trim(),
       area_atuacao_atual: areaAtuacaoAtual,
       aumento_ganhos_financeiros: aumentoGanhosFinanceiros,
       areas_de_ganho: areasDeGanho,
@@ -259,6 +262,7 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   const handleResetForm = () => {
     setEmail('');
     setNomeCompleto('');
+    setTelefone('');
     setAreaAtuacaoAtual('');
     setAumentoGanhosFinanceiros('');
     setAreasDeGanho([]);
@@ -454,6 +458,11 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
                 <p>
                   <strong>E-mail:</strong> {submitSuccess.email}
                 </p>
+                {submitSuccess.telefone && (
+                  <p>
+                    <strong>Telefone / WhatsApp:</strong> {submitSuccess.telefone}
+                  </p>
+                )}
                 <p>
                   <strong>Data de Registro:</strong>{' '}
                   {submitSuccess.created_at ? new Date(submitSuccess.created_at).toLocaleString('pt-BR') : 'Agora'}
@@ -556,6 +565,30 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
                 {errors.nome_completo && (
                   <p className="text-xs text-rose-500 font-medium pl-1">{errors.nome_completo}</p>
                 )}
+              </div>
+
+              {/* BLOCO 3: TELEFONE / WHATSAPP */}
+              <div className="bg-white p-6 md:p-8 rounded-2xl border border-gray-100 shadow-[0px_10px_30px_rgba(0,123,255,0.06)] space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-[#0059bb]/10 text-[#0059bb] font-headline font-extrabold text-xs flex items-center justify-center">
+                    3
+                  </span>
+                  <label htmlFor="telefone" className="font-headline font-bold text-base md:text-lg text-[#191c1d]">
+                    Telefone / WhatsApp
+                  </label>
+                </div>
+                <div className="relative">
+                  <Phone className="w-5 h-5 text-gray-400 absolute left-3.5 top-3.5" />
+                  <input
+                    id="telefone"
+                    type="tel"
+                    value={telefone}
+                    onChange={(e) => setTelefone(e.target.value)}
+                    placeholder="(85) 99999-9999"
+                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 text-sm font-body transition-all outline-none focus:border-[#0059bb] focus:ring-2 focus:ring-[#0059bb]/20"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-400">Informe com DDD para podermos entrar em contato, se necessário.</p>
               </div>
 
               {/* BLOCO 3: ÁREA DE ATUAÇÃO ATUAL (SINGLE SELECT) */}
@@ -1148,6 +1181,12 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
                         <td className="p-3">
                           <div className="font-bold text-[#191c1d]">{item.nome_completo}</div>
                           <div className="text-gray-500 text-[11px]">{item.email}</div>
+                          {item.telefone && (
+                            <div className="text-gray-500 text-[10px] flex items-center gap-1 mt-0.5 font-mono">
+                              <Phone className="w-2.5 h-2.5 text-gray-400" />
+                              <span>{item.telefone}</span>
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           <div className="px-2 py-0.5 rounded bg-blue-100/60 text-[#0059bb] font-semibold text-[11px] inline-block mb-1">
