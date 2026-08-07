@@ -1,0 +1,6 @@
+{
+  "name": "Natação Criativa - Dashboard",
+  "description": "Painel de controle e inteligência para turmas de Empreendedorismo Aquático e Natação Criativa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

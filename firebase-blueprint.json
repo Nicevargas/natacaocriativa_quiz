@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "QuizQuestion": {
+      "title": "QuizQuestion",
+      "description": "Perguntas do Quiz de Natação Criativa",
+      "type": "object",
+      "properties": {
+        "questionText": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Texto da pergunta"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Categoria da pergunta (Metodologia, Marketing, Finanças, Gestão)"
+        }
+      },
+      "required": ["questionText", "category"]
+    },
+    "QuizResponse": {
+      "title": "QuizResponse",
+      "description": "Resposta do participante do Quiz com o perfil diagnosticado",
+      "type": "object",
+      "properties": {
+        "studentId": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "ID único do participante"
+        },
+        "studentName": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Nome completo do aluno"
+        },
+        "studentEmail": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "E-mail de contato do aluno"
+        },
+        "cohortId": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "ID da turma/evento"
+        },
+        "profileResult": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Perfil resultado (Empreendedor em Ascensão, Visionário Estratégico, etc)"
+        },
+        "score": {
+          "type": "number",
+          "description": "Pontuação obtida no Quiz"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Status do Quiz (Completed, In Progress)"
+        },
+        "answersCount": {
+          "type": "number",
+          "description": "Quantidade de respostas concluídas"
+        },
+        "answersJson": {
+          "type": "string",
+          "description": "Respostas em formato JSON"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Observações do avaliador"
+        }
+      },
+      "required": ["studentId", "studentName", "studentEmail", "cohortId", "profileResult", "score", "status"]
+    }
+  },
+  "firestore": {
+    "/quiz_questions/{questionId}": {
+      "schema": {
+        "$ref": "#/entities/QuizQuestion"
+      },
+      "description": "Coleção de perguntas do Quiz"
+    },
+    "/quiz_responses/{responseId}": {
+      "schema": {
+        "$ref": "#/entities/QuizResponse"
+      },
+      "description": "Coleção de respostas enviadas pelos participantes do Quiz"
+    }
+  }
+}
