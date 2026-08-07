@@ -32,6 +32,7 @@ import {
   EmpreendedorismoResposta,
   EMPREENDEDORISMO_SQL_SCHEMA,
   saveEmpreendedorismoLocalResponse,
+  resendEmpreendedorismoToHubSpot,
 } from '../lib/supabase';
 
 interface EmpreendedorismoFormTabProps {
@@ -67,6 +68,25 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlScript, setShowSqlScript] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResendToHubSpot = async (recordId: string) => {
+    if (!recordId) return;
+    setResendingId(recordId);
+    try {
+      const res = await resendEmpreendedorismoToHubSpot(recordId);
+      if (res.success) {
+        // Recarrega lista
+        await loadResponses();
+      } else {
+        alert(`Erro ao reenviar para o HubSpot: ${res.error}`);
+      }
+    } catch (e: any) {
+      alert(`Erro inesperado: ${e?.message || 'Falha na conexão'}`);
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   // Public URL for external users
   const publicFormUrl = `${window.location.origin}${window.location.pathname}?mode=form`;
@@ -1104,39 +1124,98 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
                   <tr className="bg-[#f8f9fa] text-gray-700 font-headline font-bold border-b border-gray-200">
                     <th className="p-3">Data / ID</th>
                     <th className="p-3">Nome / E-mail</th>
-                    <th className="p-3">Atuação Atual</th>
-                    <th className="p-3">Aumento Finan.</th>
-                    <th className="p-3">Renda Atual</th>
+                    <th className="p-3">Atuação / Renda</th>
                     <th className="p-3">Área Empreender</th>
+                    <th className="p-3">Status HubSpot</th>
+                    <th className="p-3 text-right">Ação Sync</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-gray-800">
-                  {savedResponses.map((item, idx) => (
-                    <tr key={item.id || idx} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="p-3 font-mono text-[11px]">
-                        <div className="font-bold text-gray-900">
-                          {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : 'Hoje'}
-                        </div>
-                        <div className="text-[10px] text-gray-400 truncate max-w-[100px]">
-                          {item.id || 'N/A'}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-bold text-[#191c1d]">{item.nome_completo}</div>
-                        <div className="text-gray-500 text-[11px]">{item.email}</div>
-                      </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded bg-blue-100/60 text-[#0059bb] font-semibold">
-                          {item.area_atuacao_atual}
-                        </span>
-                      </td>
-                      <td className="p-3 font-semibold text-emerald-700">
-                        {item.aumento_ganhos_financeiros}
-                      </td>
-                      <td className="p-3">{item.renda_atual}</td>
-                      <td className="p-3 font-medium">{item.area_para_empreender}</td>
-                    </tr>
-                  ))}
+                  {savedResponses.map((item, idx) => {
+                    const status = item.hubspot_sync_status || 'synced';
+                    const isResending = resendingId === item.id;
+
+                    return (
+                      <tr key={item.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="p-3 font-mono text-[11px]">
+                          <div className="font-bold text-gray-900">
+                            {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : 'Hoje'}
+                          </div>
+                          <div className="text-[10px] text-gray-400 truncate max-w-[100px]">
+                            {item.id || 'N/A'}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-bold text-[#191c1d]">{item.nome_completo}</div>
+                          <div className="text-gray-500 text-[11px]">{item.email}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="px-2 py-0.5 rounded bg-blue-100/60 text-[#0059bb] font-semibold text-[11px] inline-block mb-1">
+                            {item.area_atuacao_atual}
+                          </div>
+                          <div className="text-[11px] text-gray-600">{item.renda_atual}</div>
+                        </td>
+                        <td className="p-3 font-medium text-[11px]">{item.area_para_empreender}</td>
+                        <td className="p-3">
+                          {status === 'synced' && (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>HubSpot Synced</span>
+                              </span>
+                              {item.hubspot_contact_id && (
+                                <div className="text-[10px] text-gray-400 font-mono">
+                                  ID: {item.hubspot_contact_id}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {status === 'processing' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                              <Loader2 className="w-3 h-3 animate-spin text-amber-600" />
+                              <span>Sincronizando...</span>
+                            </span>
+                          )}
+
+                          {status === 'pending' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <Clock className="w-3 h-3 text-blue-500" />
+                              <span>Pendente</span>
+                            </span>
+                          )}
+
+                          {status === 'error' && (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                <AlertCircle className="w-3 h-3 text-rose-600" />
+                                <span>Erro no Sync</span>
+                              </span>
+                              {item.hubspot_sync_error && (
+                                <div className="text-[10px] text-rose-600 line-clamp-1" title={item.hubspot_sync_error}>
+                                  {item.hubspot_sync_error}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => handleResendToHubSpot(item.id || '')}
+                            disabled={isResending || !item.id}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-headline font-bold flex items-center gap-1 ml-auto transition-all active:scale-95 border ${
+                              status === 'error'
+                                ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-xs'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200'
+                            }`}
+                          >
+                            <RotateCcw className={`w-3 h-3 ${isResending ? 'animate-spin' : ''}`} />
+                            <span>{isResending ? 'Enviando...' : 'Reenviar'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -80,6 +80,13 @@ export interface EmpreendedorismoResposta {
   receios_antes_do_curso: string[];
   projetos_acompanhados: string[];
   created_at?: string;
+
+  // Colunas de Sincronização HubSpot
+  hubspot_sync_status?: 'pending' | 'processing' | 'synced' | 'error';
+  hubspot_contact_id?: string;
+  hubspot_synced_at?: string;
+  hubspot_sync_error?: string;
+  hubspot_sync_attempts?: number;
 }
 
 export const EMPREENDEDORISMO_SQL_SCHEMA = `-- Copie e cole este script no Editor SQL do seu projeto Supabase:
@@ -96,7 +103,14 @@ CREATE TABLE IF NOT EXISTS public.empreendedorismo_respostas (
   exercicio_durante_pos TEXT,
   receios_antes_do_curso TEXT[],
   projetos_acompanhados TEXT[],
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  -- Colunas de Controle e Sincronização HubSpot
+  hubspot_sync_status TEXT DEFAULT 'pending' CHECK (hubspot_sync_status IN ('pending', 'processing', 'synced', 'error')),
+  hubspot_contact_id TEXT,
+  hubspot_synced_at TIMESTAMPTZ,
+  hubspot_sync_error TEXT,
+  hubspot_sync_attempts INTEGER DEFAULT 0
 );
 
 -- Habilitar Row Level Security (RLS)
@@ -264,5 +278,51 @@ export async function fetchEmpreendedorismoResponsesFromSupabase() {
     return { data: merged, error: null, isLocalOnly: false };
   } catch (err) {
     return { data: localResponses, error: null, isLocalOnly: true };
+  }
+}
+
+// Function to resend/retry sync with HubSpot for records with status 'error' or 'pending'
+export async function resendEmpreendedorismoToHubSpot(recordId: string) {
+  if (!supabase) {
+    return {
+      success: false,
+      error: 'Supabase não está configurado no ambiente. Apenas armazenamento local em uso.',
+    };
+  }
+
+  try {
+    // 1. Atualiza status no banco para 'pending'
+    await supabase
+      .from('empreendedorismo_respostas')
+      .update({
+        hubspot_sync_status: 'pending',
+        hubspot_sync_error: null,
+      })
+      .eq('id', recordId);
+
+    // 2. Invoca diretamente a Edge Function 'sync-hubspot'
+    const { data, error } = await supabase.functions.invoke('sync-hubspot', {
+      body: { record_id: recordId },
+    });
+
+    if (error) {
+      // Atualiza o registro com o erro da invocação
+      await supabase
+        .from('empreendedorismo_respostas')
+        .update({
+          hubspot_sync_status: 'error',
+          hubspot_sync_error: error.message || 'Falha ao invocar Edge Function sync-hubspot',
+        })
+        .eq('id', recordId);
+
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || 'Erro ao reprocessar sincronização com o HubSpot',
+    };
   }
 }

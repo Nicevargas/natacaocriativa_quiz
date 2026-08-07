@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, Mail, Key, LogIn, AlertCircle, Sparkles, Check, FileText } from 'lucide-react';
-import { LOGO_URL } from '../data/mockData';
+import { ShieldCheck, Lock, Mail, LogIn, AlertCircle, FileText } from 'lucide-react';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -13,21 +12,12 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   onLoginSuccess,
   onGoToPublicForm,
 }) => {
-  const [username, setUsername] = useState('admin@natacaocriativa.com');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [autoFilled, setAutoFilled] = useState(false);
 
   if (!isOpen) return null;
-
-  const handleFillDefault = () => {
-    setUsername('admin@natacaocriativa.com');
-    setPassword('admin123');
-    setError(null);
-    setAutoFilled(true);
-    setTimeout(() => setAutoFilled(false), 2000);
-  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +33,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         localStorage.setItem('admin_authenticated', 'true');
         onLoginSuccess();
       } else {
-        setError('Usuário ou senha inválidos. Utilize as credenciais padrão informadas abaixo.');
+        setError('Usuário ou senha inválidos.');
       }
       setIsSubmitting(false);
     }, 400);
@@ -66,33 +56,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         </div>
 
         <div className="p-6 md:p-8 space-y-5">
-          {/* Default Credentials Notice */}
-          <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl p-4 text-xs text-blue-900 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-headline font-bold flex items-center gap-1.5 text-[#0059bb]">
-                <Key className="w-4 h-4 text-[#0059bb]" /> Credenciais Padrão do Sistema
-              </span>
-              <button
-                type="button"
-                onClick={handleFillDefault}
-                className="text-[11px] font-bold text-[#0059bb] bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs hover:bg-blue-50 flex items-center gap-1 active:scale-95 transition-all"
-              >
-                {autoFilled ? <Check className="w-3 h-3 text-emerald-600" /> : <Sparkles className="w-3 h-3" />}
-                {autoFilled ? 'Preenchido!' : 'Preencher Padrão'}
-              </button>
-            </div>
-            <div className="bg-white/80 rounded-xl p-2.5 space-y-1 font-mono text-[11px] border border-blue-100 text-gray-700">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Usuário:</span>
-                <span className="font-bold text-[#191c1d]">admin@natacaocriativa.com</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Senha:</span>
-                <span className="font-bold text-[#191c1d]">admin123</span>
-              </div>
-            </div>
-          </div>
-
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-xs flex items-center gap-2">
@@ -114,7 +77,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin@natacaocriativa.com"
+                  placeholder="seu.email@exemplo.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0059bb] focus:bg-white transition-all"
                 />
               </div>
