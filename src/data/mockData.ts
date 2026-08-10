@@ -8,203 +8,22 @@ export const AVATAR_URL = "https://lh3.googleusercontent.com/aida-public/AB6AXuC
 
 export const INITIAL_COHORTS: Cohort[] = [
   {
-    id: 'fortaleza-01',
-    name: 'Empreendedorismo Turma 01 Fortaleza',
-    subtitle: 'Empreendedorismo Aquático - Turma 01 Overview',
-    location: 'Fortaleza / CE',
-    totalParticipants: 150,
-    quizCompletionRate: 85,
-    avgScore: 92,
-    revenueGrowth: 'R$ 45K',
-    revenueGrowthTrend: 'down',
-    revenueGrowthPercent: 2,
-    profileDistribution: [
-      { label: 'Empreendedor em Ascensão', percentage: 45, count: 67, colorClass: 'bg-[#0059bb]' },
-      { label: 'Visionário Estratégico', percentage: 35, count: 52, colorClass: 'bg-[#b80049]' },
-      { label: 'Gestor Operacional', percentage: 20, count: 31, colorClass: 'bg-[#fabd00]' },
-    ],
-    activityAreas: [
-      { area: 'Personal Aquático', count: 40, bgClass: 'bg-[#d8e2ff]', textClass: 'text-[#001a41]' },
-      { area: 'Professor de Natação', count: 65, bgClass: 'bg-[#ffd9de]', textClass: 'text-[#400014]' },
-      { area: 'Gestor de Academia', count: 25, bgClass: 'bg-[#ffdf9e]', textClass: 'text-[#261a00]' },
-      { area: 'Consultoria', count: 20, bgClass: 'bg-[#e7e8e9]', textClass: 'text-[#191c1d]' },
-    ]
-  },
-  {
-    id: 'sp-02',
-    name: 'Turma 02 São Paulo - Gestão Aquática',
-    subtitle: 'Metodologia e Gestão de Escolas de Natação',
-    location: 'São Paulo / SP',
-    totalParticipants: 320,
-    quizCompletionRate: 89.5,
-    avgScore: 88,
-    revenueGrowth: 'R$ 112K',
-    revenueGrowthTrend: 'up',
-    revenueGrowthPercent: 12,
-    profileDistribution: [
-      { label: 'Personal Aquático', percentage: 50, count: 160, colorClass: 'bg-[#0059bb]' },
-      { label: 'Dono de Metodologia', percentage: 30, count: 96, colorClass: 'bg-[#e2165f]' },
-      { label: 'Gestor de Escola', percentage: 20, count: 64, colorClass: 'bg-[#fabd00]' },
-    ],
-    activityAreas: [
-      { area: 'Personal Aquático', count: 120, bgClass: 'bg-[#d8e2ff]', textClass: 'text-[#001a41]' },
-      { area: 'Professor de Natação', count: 110, bgClass: 'bg-[#ffd9de]', textClass: 'text-[#400014]' },
-      { area: 'Gestor de Academia', count: 60, bgClass: 'bg-[#ffdf9e]', textClass: 'text-[#261a00]' },
-      { area: 'Consultoria', count: 30, bgClass: 'bg-[#e7e8e9]', textClass: 'text-[#191c1d]' },
-    ]
-  },
-  {
     id: 'all-cohorts',
-    name: 'Visão Geral - Todas as Turmas',
-    subtitle: 'Consolidado Geral de Alunos e Participantes',
+    name: 'Visão Geral - Banco de Dados Real',
+    subtitle: 'Consolidado Geral de Alunos e Participantes em Tempo Real',
     location: 'Brasil / Híbrido',
-    totalParticipants: 1248,
-    quizCompletionRate: 84.2,
-    avgScore: 89,
-    revenueGrowth: 'R$ 380K',
+    totalParticipants: 0,
+    quizCompletionRate: 0,
+    avgScore: 0,
+    revenueGrowth: 'R$ 0',
     revenueGrowthTrend: 'up',
-    revenueGrowthPercent: 15,
-    profileDistribution: [
-      { label: 'Personal Aquático', percentage: 60, count: 748, colorClass: 'bg-[#0059bb]' },
-      { label: 'Dono de Metodologia', percentage: 25, count: 312, colorClass: 'bg-[#e2165f]' },
-      { label: 'Gestor de Escola', percentage: 15, count: 188, colorClass: 'bg-[#fabd00]' },
-    ],
-    activityAreas: [
-      { area: 'Personal Aquático', count: 520, bgClass: 'bg-[#d8e2ff]', textClass: 'text-[#001a41]' },
-      { area: 'Professor de Natação', count: 430, bgClass: 'bg-[#ffd9de]', textClass: 'text-[#400014]' },
-      { area: 'Gestor de Academia', count: 180, bgClass: 'bg-[#ffdf9e]', textClass: 'text-[#261a00]' },
-      { area: 'Consultoria', count: 118, bgClass: 'bg-[#e7e8e9]', textClass: 'text-[#191c1d]' },
-    ]
+    revenueGrowthPercent: 0,
+    profileDistribution: [],
+    activityAreas: []
   }
 ];
 
-export const INITIAL_STUDENTS: Student[] = [
-  {
-    id: 's-01',
-    name: 'Maria José',
-    avatarInitials: 'MJ',
-    email: 'mariajose@natacaocriativa.com',
-    phone: '(85) 99823-1122',
-    city: 'Fortaleza - CE',
-    cohortId: 'fortaleza-01',
-    profile: 'Visionário Estratégico',
-    roleArea: 'Professor de Natação',
-    score: 95,
-    quizStatus: 'Completed',
-    completedAt: 'Hoje, 10:30',
-    answersCount: 10,
-    notes: 'Excelente visão de expansão de turmas infantis. Busca criar metodologia própria.'
-  },
-  {
-    id: 's-02',
-    name: 'Carlos Silva',
-    avatarInitials: 'CS',
-    email: 'carlos.silva@aquasport.com.br',
-    phone: '(85) 98744-3321',
-    city: 'Fortaleza - CE',
-    cohortId: 'fortaleza-01',
-    profile: 'Empreendedor em Ascensão',
-    roleArea: 'Personal Aquático',
-    score: 88,
-    quizStatus: 'Completed',
-    completedAt: 'Ontem, 14:15',
-    answersCount: 10,
-    notes: 'Personal de alto rendimento querendo estruturar turmas VIPs.'
-  },
-  {
-    id: 's-03',
-    name: 'Ana Paula',
-    avatarInitials: 'AP',
-    email: 'ana.paula@natacaoinfantil.com',
-    phone: '(85) 99112-9876',
-    city: 'Caucaia - CE',
-    cohortId: 'fortaleza-01',
-    profile: 'Gestor Operacional',
-    roleArea: 'Gestor de Academia',
-    score: 76,
-    quizStatus: 'Completed',
-    completedAt: '24 Out, 2023',
-    answersCount: 10,
-    notes: 'Focada na otimização da retenção de alunos e horários de piscina.'
-  },
-  {
-    id: 's-04',
-    name: 'Roberto Lima',
-    avatarInitials: 'RL',
-    email: 'roberto.lima@piscinafitness.com',
-    phone: '(85) 98833-2211',
-    city: 'Fortaleza - CE',
-    cohortId: 'fortaleza-01',
-    profile: 'Personal Aquático',
-    roleArea: 'Personal Aquático',
-    score: 91,
-    quizStatus: 'Completed',
-    completedAt: '22 Out, 2023',
-    answersCount: 10,
-    notes: 'Atende adultos com medo de água e reabilitação aquática.'
-  },
-  {
-    id: 's-05',
-    name: 'Juliana Costa',
-    avatarInitials: 'JC',
-    email: 'juliana.costa@swimkids.com',
-    phone: '(11) 97722-5544',
-    city: 'São Paulo - SP',
-    cohortId: 'sp-02',
-    profile: 'Visionário Estratégico',
-    roleArea: 'Dono de Metodologia',
-    score: 94,
-    quizStatus: 'Completed',
-    completedAt: 'Há 2 horas',
-    answersCount: 10,
-    notes: 'Proprietária de rede com 3 unidades em SP.'
-  },
-  {
-    id: 's-06',
-    name: 'Lucas Mendes',
-    avatarInitials: 'LM',
-    email: 'lucas.mendes@natacao.edu.br',
-    phone: '(11) 98112-3344',
-    city: 'Campinas - SP',
-    cohortId: 'sp-02',
-    profile: 'Empreendedor em Ascensão',
-    roleArea: 'Professor de Natação',
-    score: 82,
-    quizStatus: 'Completed',
-    completedAt: 'Ontem, 18:00',
-    answersCount: 10
-  },
-  {
-    id: 's-07',
-    name: 'Camila Rocha',
-    avatarInitials: 'CR',
-    email: 'camila.rocha@aquatraining.com',
-    phone: '(85) 99445-6677',
-    city: 'Eusébio - CE',
-    cohortId: 'fortaleza-01',
-    profile: 'Consultoria',
-    roleArea: 'Consultoria',
-    score: 96,
-    quizStatus: 'Completed',
-    completedAt: '20 Out, 2023',
-    answersCount: 10
-  },
-  {
-    id: 's-08',
-    name: 'Fernando Alves',
-    avatarInitials: 'FA',
-    email: 'fernando.alves@piscina.com',
-    phone: '(85) 98122-9988',
-    city: 'Fortaleza - CE',
-    cohortId: 'fortaleza-01',
-    profile: 'Gestor Operacional',
-    roleArea: 'Gestor de Academia',
-    score: 65,
-    quizStatus: 'In Progress',
-    completedAt: 'Em andamento',
-    answersCount: 6
-  }
-];
+export const INITIAL_STUDENTS: Student[] = [];
 
 export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
@@ -264,21 +83,4 @@ export const QUIZ_QUESTIONS: QuizQuestion[] = [
   }
 ];
 
-export const INITIAL_REPORTS: ReportItem[] = [
-  {
-    id: 'rep-01',
-    title: 'Relatório Consolidado Turma 01 Fortaleza',
-    cohortName: 'Empreendedorismo Turma 01 Fortaleza',
-    generatedAt: '05/11/2023',
-    type: 'Perfil e Diagnóstico',
-    author: 'Equipe Natação Criativa'
-  },
-  {
-    id: 'rep-02',
-    title: 'Análise de Desempenho e Engajamento do Quiz',
-    cohortName: 'Turma 02 São Paulo',
-    generatedAt: '01/11/2023',
-    type: 'Estatísticas',
-    author: 'Gestão Pedagógica'
-  }
-];
+export const INITIAL_REPORTS: ReportItem[] = [];

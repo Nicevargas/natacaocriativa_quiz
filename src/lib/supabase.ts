@@ -1,14 +1,117 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const env = (import.meta as any).env || {};
-const supabaseUrl = env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || '';
+export function getSupabaseCredentials(): { url: string; key: string } {
+  const env = (import.meta as any).env || {};
+  let url = (typeof window !== 'undefined' ? localStorage.getItem('CUSTOM_SUPABASE_URL') : null) || env.VITE_SUPABASE_URL || '';
+  let key = (typeof window !== 'undefined' ? localStorage.getItem('CUSTOM_SUPABASE_ANON_KEY') : null) || env.VITE_SUPABASE_ANON_KEY || '';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+  // Clean up placeholders
+  if (url.includes('your-project.supabase.co')) url = '';
+  if (key === 'your-anon-key') key = '';
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+  return { url: url.trim(), key: key.trim() };
+}
+
+export function saveSupabaseCredentials(url: string, key: string) {
+  if (typeof window !== 'undefined') {
+    if (url) localStorage.setItem('CUSTOM_SUPABASE_URL', url.trim());
+    else localStorage.removeItem('CUSTOM_SUPABASE_URL');
+
+    if (key) localStorage.setItem('CUSTOM_SUPABASE_ANON_KEY', key.trim());
+    else localStorage.removeItem('CUSTOM_SUPABASE_ANON_KEY');
+  }
+}
+
+export function isSupabaseReady(): boolean {
+  const { url, key } = getSupabaseCredentials();
+  return Boolean(url && key);
+}
+
+// Global cached client instance
+let cachedClient: SupabaseClient | null = null;
+let lastUrl = '';
+let lastKey = '';
+
+export function getSupabaseClient(): SupabaseClient | null {
+  const { url, key } = getSupabaseCredentials();
+  if (!url || !key) return null;
+
+  if (cachedClient && lastUrl === url && lastKey === key) {
+    return cachedClient;
+  }
+
+  try {
+    cachedClient = createClient(url, key);
+    lastUrl = url;
+    lastKey = key;
+    return cachedClient;
+  } catch (err) {
+    console.error('Erro ao instanciar cliente do Supabase:', err);
+    return null;
+  }
+}
+
+export const isSupabaseConfigured = isSupabaseReady();
+export const supabase = getSupabaseClient();
+
+export async function testSupabaseConnection(
+  urlInput?: string,
+  keyInput?: string
+): Promise<{
+  success: boolean;
+  message: string;
+  code?: string;
+}> {
+  if (urlInput && keyInput) {
+    saveSupabaseCredentials(urlInput, keyInput);
+  }
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não configuradas.',
+    };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('empreendedorismo_respostas')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      if (error.code === '42P01') {
+        return {
+          success: false,
+          code: '42P01',
+          message: 'Tabela public.empreendedorismo_respostas não existe no Supabase. Execute o script SQL fornecido.',
+        };
+      }
+      if (error.code === '42501') {
+        return {
+          success: false,
+          code: '42501',
+          message: 'Permissão negada (RLS). Execute a política CREATE POLICY para permitir acesso anônimo.',
+        };
+      }
+      return {
+        success: false,
+        code: error.code,
+        message: `Erro do Supabase (${error.code}): ${error.message}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: `Conexão bem-sucedida com o Supabase! Tabela 'empreendedorismo_respostas' acessível. (${data.length} registros encontrados)`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Erro ao conectar: ${err.message || 'Verifique a URL e a Chave'}`,
+    };
+  }
+}
 
 export interface SupabaseQuizResponse {
   id?: string;
@@ -27,12 +130,13 @@ export interface SupabaseQuizResponse {
 
 // Function to submit a response to Supabase
 export async function submitQuizResponseToSupabase(responseData: Omit<SupabaseQuizResponse, 'id' | 'created_at'>) {
-  if (!supabase) {
+  const client = getSupabaseClient();
+  if (!client) {
     console.warn('Supabase não está configurado. Usando modo de simulação local.');
     return { data: null, error: null };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('quiz_responses')
     .insert([responseData])
     .select();
@@ -42,9 +146,10 @@ export async function submitQuizResponseToSupabase(responseData: Omit<SupabaseQu
 
 // Function to subscribe to realtime response inserts
 export function subscribeToRealtimeQuizResponses(onNewResponse: (response: SupabaseQuizResponse) => void) {
-  if (!supabase) return () => {};
+  const client = getSupabaseClient();
+  if (!client) return () => {};
 
-  const channel = supabase
+  const channel = client
     .channel('public:quiz_responses')
     .on(
       'postgres_changes',
@@ -62,7 +167,7 @@ export function subscribeToRealtimeQuizResponses(onNewResponse: (response: Supab
     .subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+    client.removeChannel(channel);
   };
 }
 
@@ -128,51 +233,20 @@ CREATE POLICY "Permitir leitura anonima" ON public.empreendedorismo_respostas FO
 
 const LOCAL_STORAGE_KEY = 'empreendedorismo_local_responses';
 
-const INITIAL_LOCAL_RESPONSES: EmpreendedorismoResposta[] = [
-  {
-    id: 'local-demo-1',
-    email: 'carlos.eduardo@exemplo.com.br',
-    nome_completo: 'Carlos Eduardo Silva',
-    area_atuacao_atual: 'Professor de Natação Infantil e Bebês',
-    aumento_ganhos_financeiros: 'Sim, entre 30% e 60%',
-    areas_de_ganho: ['Aulas Particulares / Personal Swimming', 'Consultoria e Treinamentos'],
-    area_para_empreender: 'Escola / Metodologia Própria de Natação',
-    planos_apos_pos_graduacao: 'Abrir meu próprio negócio aquático nos próximos 6 meses',
-    renda_atual: 'R$ 4.001 a R$ 7.000',
-    exercicio_durante_pos: 'Sim, leciono e pratico natação semanalmente',
-    receios_antes_do_curso: ['Insegurança na gestão financeira e precificação'],
-    projetos_acompanhados: ['Academia / Escola de Natação', 'Metodologia Própria'],
-    created_at: new Date(Date.now() - 3600000 * 24).toISOString(),
-  },
-  {
-    id: 'local-demo-2',
-    email: 'mariana.alves@exemplo.com.br',
-    nome_completo: 'Mariana Alves Rocha',
-    area_atuacao_atual: 'Coordenadora Pedagógica Aquática',
-    aumento_ganhos_financeiros: 'Sim, mais que dobrou (100%+)',
-    areas_de_ganho: ['Gestão de Academia / Módulo de Piscina', 'Cursos e Eventos Aquáticos'],
-    area_para_empreender: 'Consultoria para Academias e Clubes',
-    planos_apos_pos_graduacao: 'Expandir a consultoria e metodologia atual',
-    renda_atual: 'R$ 7.001 a R$ 10.000',
-    exercicio_durante_pos: 'Sim, pratico atividades aquáticas regularmente',
-    receios_antes_do_curso: ['Falta de conhecimento em marketing e captação de alunos'],
-    projetos_acompanhados: ['Consultoria em Gestão Aquática'],
-    created_at: new Date(Date.now() - 3600000 * 48).toISOString(),
-  },
-];
+const INITIAL_LOCAL_RESPONSES: EmpreendedorismoResposta[] = [];
 
 // Helper to get local responses
 export function getEmpreendedorismoLocalResponses(): EmpreendedorismoResposta[] {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_LOCAL_RESPONSES));
-      return INITIAL_LOCAL_RESPONSES;
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([]));
+      return [];
     }
     return JSON.parse(raw);
   } catch (e) {
     console.error('Erro ao ler respostas do localStorage', e);
-    return INITIAL_LOCAL_RESPONSES;
+    return [];
   }
 }
 
@@ -199,21 +273,33 @@ export function saveEmpreendedorismoLocalResponse(
 export async function submitEmpreendedorismoFormToSupabase(
   formData: Omit<EmpreendedorismoResposta, 'id' | 'created_at'>
 ) {
-  // Always save locally first as a fallback guarantee
   const localSaved = saveEmpreendedorismoLocalResponse(formData);
+  const client = getSupabaseClient();
 
-  if (!supabase) {
+  // Try direct HubSpot sync
+  const { syncEmpreendedorismoRecordToHubspot } = await import('./hubspot');
+  const hubspotSyncResult = await syncEmpreendedorismoRecordToHubspot(formData);
+
+  if (!client) {
     return {
       data: [localSaved],
       savedLocally: true,
-      error: null,
+      hubspotSyncResult,
+      error: new Error('O Supabase não está configurado com URL/Chave no app. Clique em "Configurar Supabase" para conectar seu banco de dados.'),
     };
   }
 
   try {
-    const { data, error } = await supabase
+    const payloadWithHubspot = {
+      ...formData,
+      hubspot_sync_status: hubspotSyncResult.success ? 'synced' : 'pending',
+      hubspot_contact_id: hubspotSyncResult.contactId || null,
+      hubspot_sync_error: hubspotSyncResult.success ? null : hubspotSyncResult.message,
+    };
+
+    const { data, error } = await client
       .from('empreendedorismo_respostas')
-      .insert([formData])
+      .insert([payloadWithHubspot])
       .select();
 
     if (error) {
@@ -221,17 +307,19 @@ export async function submitEmpreendedorismoFormToSupabase(
       return {
         data: [localSaved],
         savedLocally: true,
-        error: new Error(`Erro do Supabase: ${error.message} (A resposta foi salva localmente no navegador)`),
+        hubspotSyncResult,
+        error: new Error(`Erro do Supabase (${error.code || 'RLS'}): ${error.message}`),
       };
     }
 
-    return { data, savedLocally: false, error: null };
+    return { data, savedLocally: false, hubspotSyncResult, error: null };
   } catch (err: any) {
     console.warn('Exceção no Supabase, mantendo cópia local:', err);
     return {
       data: [localSaved],
       savedLocally: true,
-      error: new Error(`Falha de conexão: ${err.message || 'Supabase fora do ar'} (Salvo localmente)`),
+      hubspotSyncResult,
+      error: new Error(`Falha de conexão com o Supabase: ${err.message || 'Verifique sua URL/Chave'}`),
     };
   }
 }
@@ -239,13 +327,14 @@ export async function submitEmpreendedorismoFormToSupabase(
 // Function to fetch all empreendedorismo responses (merging Supabase + LocalStorage)
 export async function fetchEmpreendedorismoResponsesFromSupabase() {
   const localResponses = getEmpreendedorismoLocalResponses();
+  const client = getSupabaseClient();
 
-  if (!supabase) {
+  if (!client) {
     return { data: localResponses, error: null, isLocalOnly: true };
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('empreendedorismo_respostas')
       .select('*')
       .order('created_at', { ascending: false });
@@ -278,14 +367,15 @@ export async function fetchEmpreendedorismoResponsesFromSupabase() {
     );
 
     return { data: merged, error: null, isLocalOnly: false };
-  } catch (err) {
-    return { data: localResponses, error: null, isLocalOnly: true };
+  } catch (err: any) {
+    return { data: localResponses, error: err, isLocalOnly: true };
   }
 }
 
 // Function to resend/retry sync with HubSpot for records with status 'error' or 'pending'
 export async function resendEmpreendedorismoToHubSpot(recordId: string) {
-  if (!supabase) {
+  const client = getSupabaseClient();
+  if (!client) {
     return {
       success: false,
       error: 'Supabase não está configurado no ambiente. Apenas armazenamento local em uso.',
@@ -293,38 +383,101 @@ export async function resendEmpreendedorismoToHubSpot(recordId: string) {
   }
 
   try {
-    // 1. Atualiza status no banco para 'pending'
-    await supabase
+    // 1. Fetch the record details first
+    const { data: record, error: fetchErr } = await client
+      .from('empreendedorismo_respostas')
+      .select('*')
+      .eq('id', recordId)
+      .single();
+
+    if (fetchErr || !record) {
+      return { success: false, error: 'Registro não encontrado no Supabase.' };
+    }
+
+    // 2. Update status in DB to 'processing'
+    await client
       .from('empreendedorismo_respostas')
       .update({
-        hubspot_sync_status: 'pending',
+        hubspot_sync_status: 'processing',
         hubspot_sync_error: null,
       })
       .eq('id', recordId);
 
-    // 2. Invoca diretamente a Edge Function 'sync-hubspot'
-    const { data, error } = await supabase.functions.invoke('sync-hubspot', {
+    // 3. Try Edge Function first
+    const { data, error: edgeErr } = await client.functions.invoke('sync-hubspot', {
       body: { record_id: recordId },
     });
 
-    if (error) {
-      // Atualiza o registro com o erro da invocação
-      await supabase
-        .from('empreendedorismo_respostas')
-        .update({
-          hubspot_sync_status: 'error',
-          hubspot_sync_error: error.message || 'Falha ao invocar Edge Function sync-hubspot',
-        })
-        .eq('id', recordId);
-
-      return { success: false, error: error.message };
+    if (!edgeErr) {
+      return { success: true, data };
     }
 
-    return { success: true, data };
+    // 4. Fallback: If Edge Function fails or isn't deployed, check if client has HubSpot Token configured
+    const { getHubspotToken, syncEmpreendedorismoRecordToHubspot } = await import('./hubspot');
+    const token = getHubspotToken();
+
+    if (token) {
+      const directRes = await syncEmpreendedorismoRecordToHubspot(record);
+
+      if (directRes.success) {
+        await client
+          .from('empreendedorismo_respostas')
+          .update({
+            hubspot_sync_status: 'synced',
+            hubspot_contact_id: directRes.contactId || 'direct-api',
+            hubspot_sync_error: null,
+          })
+          .eq('id', recordId);
+
+        return { success: true, message: 'Sincronizado diretamente com HubSpot API!' };
+      } else {
+        await client
+          .from('empreendedorismo_respostas')
+          .update({
+            hubspot_sync_status: 'error',
+            hubspot_sync_error: directRes.message,
+          })
+          .eq('id', recordId);
+
+        return { success: false, error: directRes.message };
+      }
+    }
+
+    // If no local token either, log Edge Function error
+    await client
+      .from('empreendedorismo_respostas')
+      .update({
+        hubspot_sync_status: 'error',
+        hubspot_sync_error: edgeErr.message || 'Edge Function sync-hubspot indisponível',
+      })
+      .eq('id', recordId);
+
+    return { success: false, error: edgeErr.message };
   } catch (err: any) {
     return {
       success: false,
       error: err.message || 'Erro ao reprocessar sincronização com o HubSpot',
     };
+  }
+}
+
+// Function to fetch quiz responses from Supabase table 'quiz_responses'
+export async function fetchQuizResponsesFromSupabase(): Promise<SupabaseQuizResponse[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  try {
+    const { data, error } = await client
+      .from('quiz_responses')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Erro ao buscar quiz_responses do Supabase:', error);
+      return [];
+    }
+    return (data as SupabaseQuizResponse[]) || [];
+  } catch (err) {
+    console.error('Exceção ao buscar quiz_responses:', err);
+    return [];
   }
 }

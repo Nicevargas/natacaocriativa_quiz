@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Send,
   Loader2,
   ListFilter,
@@ -35,6 +36,7 @@ import {
   saveEmpreendedorismoLocalResponse,
   resendEmpreendedorismoToHubSpot,
 } from '../lib/supabase';
+import { IntegrationDiagnostic } from './IntegrationDiagnostic';
 
 interface EmpreendedorismoFormTabProps {
   isStandalone?: boolean;
@@ -64,30 +66,82 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Admin View State & Public Share Link
-  const [activeSubTab, setActiveSubTab] = useState<'form' | 'responses'>('form');
+  const [activeSubTab, setActiveSubTab] = useState<'form' | 'responses' | 'diagnostic'>('form');
   const [savedResponses, setSavedResponses] = useState<EmpreendedorismoResposta[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [showSqlScript, setShowSqlScript] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
-  const handleResendToHubSpot = async (recordId: string) => {
-    if (!recordId) return;
+  const handleResendToHubSpot = async (item: EmpreendedorismoResposta) => {
+    if (!item) return;
+    const recordId = item.id || '';
     setResendingId(recordId);
     try {
-      const res = await resendEmpreendedorismoToHubSpot(recordId);
-      if (res.success) {
-        // Recarrega lista
-        await loadResponses();
+      if (recordId.startsWith('local-') || !isSupabaseConfigured) {
+        const { syncEmpreendedorismoRecordToHubspot } = await import('../lib/hubspot');
+        const res = await syncEmpreendedorismoRecordToHubspot(item);
+        if (res.success) {
+          setSavedResponses((prev) =>
+            prev.map((r) =>
+              r.id === recordId
+                ? { ...r, hubspot_sync_status: 'synced', hubspot_contact_id: res.contactId }
+                : r
+            )
+          );
+        } else {
+          alert(`Erro ao enviar para o HubSpot: ${res.message}`);
+        }
       } else {
-        alert(`Erro ao reenviar para o HubSpot: ${res.error}`);
+        const res = await resendEmpreendedorismoToHubSpot(recordId);
+        if (res.success) {
+          await loadResponses();
+        } else {
+          alert(`Erro ao reenviar para o HubSpot: ${res.error}`);
+        }
       }
     } catch (e: any) {
       alert(`Erro inesperado: ${e?.message || 'Falha na conexão'}`);
     } finally {
       setResendingId(null);
     }
+  };
+
+  const handleSyncAllToHubSpot = async () => {
+    if (savedResponses.length === 0) return;
+    setIsSyncingAll(true);
+    const { syncEmpreendedorismoRecordToHubspot } = await import('../lib/hubspot');
+
+    let countSuccess = 0;
+    let countFail = 0;
+
+    for (const item of savedResponses) {
+      try {
+        const res = await syncEmpreendedorismoRecordToHubspot(item);
+        if (res.success) {
+          countSuccess++;
+          setSavedResponses((prev) =>
+            prev.map((r) =>
+              r.id === item.id
+                ? { ...r, hubspot_sync_status: 'synced', hubspot_contact_id: res.contactId }
+                : r
+            )
+          );
+        } else {
+          countFail++;
+        }
+      } catch (e) {
+        countFail++;
+      }
+    }
+
+    setIsSyncingAll(false);
+    if (isSupabaseConfigured) {
+      await loadResponses();
+    }
+    alert(`Sincronização concluída!\nSucessos no HubSpot: ${countSuccess}\nFalhas: ${countFail}`);
   };
 
   // Public URL for external users
@@ -112,6 +166,79 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
       console.warn('Clipboard write failed', e);
     }
   };
+
+  const DRAFT_KEY = 'empreendedorismo_form_draft';
+
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft);
+        if (draft.email) setEmail(draft.email);
+        if (draft.nomeCompleto) setNomeCompleto(draft.nomeCompleto);
+        if (draft.telefone) setTelefone(draft.telefone);
+        if (draft.areaAtuacaoAtual) setAreaAtuacaoAtual(draft.areaAtuacaoAtual);
+        if (draft.aumentoGanhosFinanceiros) setAumentoGanhosFinanceiros(draft.aumentoGanhosFinanceiros);
+        if (Array.isArray(draft.areasDeGanho)) setAreasDeGanho(draft.areasDeGanho);
+        if (draft.areaParaEmpreender) setAreaParaEmpreender(draft.areaParaEmpreender);
+        if (draft.planosAposPosGraduacao) setPlanosAposPosGraduacao(draft.planosAposPosGraduacao);
+        if (draft.rendaAtual) setRendaAtual(draft.rendaAtual);
+        if (draft.exercicioDurantePos) setExercicioDurantePos(draft.exercicioDurantePos);
+        if (Array.isArray(draft.receiosAntesDoCurso)) setReceiosAntesDoCurso(draft.receiosAntesDoCurso);
+        if (Array.isArray(draft.projetosAcompanhados)) setProjetosAcompanhados(draft.projetosAcompanhados);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar rascunho em memória:', e);
+    }
+  }, []);
+
+  // Save draft continuously as user types
+  useEffect(() => {
+    if (
+      email ||
+      nomeCompleto ||
+      telefone ||
+      areaAtuacaoAtual ||
+      aumentoGanhosFinanceiros ||
+      areasDeGanho.length > 0 ||
+      areaParaEmpreender ||
+      planosAposPosGraduacao ||
+      rendaAtual ||
+      exercicioDurantePos ||
+      receiosAntesDoCurso.length > 0 ||
+      projetosAcompanhados.length > 0
+    ) {
+      const draft = {
+        email,
+        nomeCompleto,
+        telefone,
+        areaAtuacaoAtual,
+        aumentoGanhosFinanceiros,
+        areasDeGanho,
+        areaParaEmpreender,
+        planosAposPosGraduacao,
+        rendaAtual,
+        exercicioDurantePos,
+        receiosAntesDoCurso,
+        projetosAcompanhados,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+  }, [
+    email,
+    nomeCompleto,
+    telefone,
+    areaAtuacaoAtual,
+    aumentoGanhosFinanceiros,
+    areasDeGanho,
+    areaParaEmpreender,
+    planosAposPosGraduacao,
+    rendaAtual,
+    exercicioDurantePos,
+    receiosAntesDoCurso,
+    projetosAcompanhados,
+  ]);
 
   // Load saved responses when switching to responses tab
   useEffect(() => {
@@ -236,23 +363,27 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
     };
 
     try {
-      const { data, error } = await submitEmpreendedorismoFormToSupabase(payload);
+      const { data, savedLocally, error } = await submitEmpreendedorismoFormToSupabase(payload);
+
+      if (error) {
+        setSubmitError(error.message);
+      } else {
+        setSubmitError(null);
+      }
 
       const savedItem = (data && data[0])
         ? (data[0] as EmpreendedorismoResposta)
         : { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
 
       setSubmitSuccess(savedItem);
-
-      if (error) {
-        console.warn('Nota do banco de dados:', error.message);
-      }
-
+      localStorage.removeItem(DRAFT_KEY);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Erro ao enviar formulário, ativando salvamento de emergência:', err);
       const localSaved = saveEmpreendedorismoLocalResponse(payload);
+      setSubmitError(err.message || 'Falha de conexão com o banco de dados');
       setSubmitSuccess(localSaved);
+      localStorage.removeItem(DRAFT_KEY);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
@@ -260,6 +391,9 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   };
 
   const handleResetForm = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch (e) {}
     setEmail('');
     setNomeCompleto('');
     setTelefone('');
@@ -318,6 +452,16 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" /> Ver Respostas Gravadas
+            </button>
+            <button
+              onClick={() => setActiveSubTab('diagnostic')}
+              className={`flex-1 md:flex-initial px-4 py-2 rounded-lg font-headline font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all ${
+                activeSubTab === 'diagnostic'
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-orange-600" /> Diagnóstico de Integração
             </button>
           </div>
         )}
@@ -436,57 +580,123 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
       {/* SUB TAB 1: FORM FILLING */}
       {activeSubTab === 'form' && (
         <>
-          {/* SUCCESS MESSAGE AFTER CONFIRMATION FROM DB */}
+          {/* SUCCESS MESSAGE AFTER CONFIRMATION FROM DB OR LOCAL STORAGE */}
           {submitSuccess ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center space-y-4 animate-fadeIn">
-              <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-                <CheckCircle2 className="w-10 h-10" />
-              </div>
-              <div>
-                <h2 className="font-headline text-2xl font-bold text-emerald-950">
-                  Resposta Gravada com Sucesso no Banco de Dados!
-                </h2>
-                <p className="text-sm text-emerald-800 mt-1">
-                  Obrigado, <strong>{submitSuccess.nome_completo}</strong>! Suas respostas da Turma 01 Fortaleza foram registradas na tabela <code className="font-bold">empreendedorismo_respostas</code>.
-                </p>
-              </div>
-
-              <div className="p-4 bg-white rounded-xl border border-emerald-200 max-w-lg mx-auto text-left text-xs space-y-1.5 font-mono text-gray-700">
-                <p>
-                  <strong>ID do Registro:</strong> {submitSuccess.id || 'Confirmado via DB'}
-                </p>
-                <p>
-                  <strong>E-mail:</strong> {submitSuccess.email}
-                </p>
-                {submitSuccess.telefone && (
-                  <p>
-                    <strong>Telefone / WhatsApp:</strong> {submitSuccess.telefone}
+            submitSuccess.id?.startsWith('local-') ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 md:p-8 text-center space-y-4 animate-fadeIn">
+                <div className="w-16 h-16 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+                  <AlertCircle className="w-10 h-10" />
+                </div>
+                <div>
+                  <h2 className="font-headline text-2xl font-bold text-amber-950">
+                    Salvo no Armazenamento Local do Navegador
+                  </h2>
+                  <p className="text-sm text-amber-900 mt-1">
+                    Obrigado, <strong>{submitSuccess.nome_completo}</strong>! Seu formulário foi registrado com sucesso neste navegador (ID: <code className="font-mono text-xs bg-amber-100 px-1 py-0.5 rounded">{submitSuccess.id}</code>).
                   </p>
-                )}
-                <p>
-                  <strong>Data de Registro:</strong>{' '}
-                  {submitSuccess.created_at ? new Date(submitSuccess.created_at).toLocaleString('pt-BR') : 'Agora'}
-                </p>
-                <p>
-                  <strong>Área de Atuação:</strong> {submitSuccess.area_atuacao_atual}
-                </p>
-              </div>
+                </div>
 
-              <div className="pt-2 flex justify-center gap-3">
-                <button
-                  onClick={handleResetForm}
-                  className="px-6 py-3 bg-[#0059bb] hover:bg-[#0070ea] text-white font-headline font-bold text-xs md:text-sm rounded-xl shadow-md transition-all flex items-center gap-2"
-                >
-                  <RotateCcw className="w-4 h-4" /> Preencher Novo Formulário
-                </button>
-                <button
-                  onClick={() => setActiveSubTab('responses')}
-                  className="px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-headline font-bold text-xs md:text-sm rounded-xl transition-all flex items-center gap-2"
-                >
-                  <Eye className="w-4 h-4" /> Ver Respostas na Tabela
-                </button>
+                <div className="p-4 bg-white/90 rounded-xl border border-amber-200 max-w-xl mx-auto text-left text-xs space-y-2 text-amber-950">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5 border-b border-amber-200 pb-2 font-headline">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" /> Por que este registro não foi gravado no Supabase?
+                  </div>
+                  <p className="text-xs text-amber-900 leading-relaxed font-sans">
+                    {submitError || 'As variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY não estão ativas no ambiente ou a tabela public.empreendedorismo_respostas não possui permissão de escrita (RLS).'}
+                  </p>
+                  <div className="bg-amber-100/70 p-3 rounded-lg text-[11px] font-mono text-amber-950 space-y-1.5 border border-amber-200">
+                    <p className="font-bold font-sans text-amber-900">Como gravar direto na tabela do Supabase:</p>
+                    <p>1. Abra o <strong>SQL Editor</strong> do seu projeto no Dashboard do Supabase.</p>
+                    <p>2. Execute o código abaixo para criar a tabela e liberar inserção anônima:</p>
+                    <code className="block bg-amber-950 text-amber-200 p-2 rounded text-[10px] select-all overflow-x-auto">
+                      CREATE POLICY "Permitir insercao anonima" ON public.empreendedorismo_respostas FOR INSERT WITH CHECK (true);
+                    </code>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white rounded-xl border border-amber-200 max-w-lg mx-auto text-left text-xs space-y-1.5 font-mono text-gray-700">
+                  <p>
+                    <strong>ID do Registro:</strong> {submitSuccess.id}
+                  </p>
+                  <p>
+                    <strong>E-mail:</strong> {submitSuccess.email}
+                  </p>
+                  {submitSuccess.telefone && (
+                    <p>
+                      <strong>Telefone / WhatsApp:</strong> {submitSuccess.telefone}
+                    </p>
+                  )}
+                  <p>
+                    <strong>Data:</strong>{' '}
+                    {submitSuccess.created_at ? new Date(submitSuccess.created_at).toLocaleString('pt-BR') : 'Agora'}
+                  </p>
+                </div>
+
+                <div className="pt-2 flex justify-center gap-3 flex-wrap">
+                  <button
+                    onClick={handleResetForm}
+                    className="px-6 py-3 bg-[#0059bb] hover:bg-[#0070ea] text-white font-headline font-bold text-xs md:text-sm rounded-xl shadow-md transition-all flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" /> Preencher Novo Formulário
+                  </button>
+                  <button
+                    onClick={() => setActiveSubTab('responses')}
+                    className="px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-headline font-bold text-xs md:text-sm rounded-xl transition-all flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" /> Ver Respostas Gravadas
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center space-y-4 animate-fadeIn">
+                <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+                  <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <div>
+                  <h2 className="font-headline text-2xl font-bold text-emerald-950">
+                    Gravado com Sucesso na Tabela 'empreendedorismo_respostas'!
+                  </h2>
+                  <p className="text-sm text-emerald-800 mt-1">
+                    Obrigado, <strong>{submitSuccess.nome_completo}</strong>! Suas respostas da Turma 01 Fortaleza foram salvas diretamente no banco de dados Supabase em tempo real.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-xl border border-emerald-200 max-w-lg mx-auto text-left text-xs space-y-1.5 font-mono text-gray-700">
+                  <p>
+                    <strong>ID do Registro no Supabase:</strong> {submitSuccess.id}
+                  </p>
+                  <p>
+                    <strong>E-mail:</strong> {submitSuccess.email}
+                  </p>
+                  {submitSuccess.telefone && (
+                    <p>
+                      <strong>Telefone / WhatsApp:</strong> {submitSuccess.telefone}
+                    </p>
+                  )}
+                  <p>
+                    <strong>Data de Registro:</strong>{' '}
+                    {submitSuccess.created_at ? new Date(submitSuccess.created_at).toLocaleString('pt-BR') : 'Agora'}
+                  </p>
+                  <p>
+                    <strong>Área de Atuação:</strong> {submitSuccess.area_atuacao_atual}
+                  </p>
+                </div>
+
+                <div className="pt-2 flex justify-center gap-3 flex-wrap">
+                  <button
+                    onClick={handleResetForm}
+                    className="px-6 py-3 bg-[#0059bb] hover:bg-[#0070ea] text-white font-headline font-bold text-xs md:text-sm rounded-xl shadow-md transition-all flex items-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" /> Preencher Novo Formulário
+                  </button>
+                  <button
+                    onClick={() => setActiveSubTab('responses')}
+                    className="px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-headline font-bold text-xs md:text-sm rounded-xl transition-all flex items-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" /> Ver Respostas na Tabela
+                  </button>
+                </div>
+              </div>
+            )
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* GLOBAL ERROR ALERT */}
@@ -1119,22 +1329,52 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
         <div className="bg-white p-6 md:p-8 rounded-2xl border border-gray-100 shadow-[0px_10px_30px_rgba(0,123,255,0.06)] space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
             <div>
-              <h2 className="font-headline text-lg md:text-xl font-bold text-[#191c1d]">
-                Respostas da Tabela <code className="text-[#0059bb]">empreendedorismo_respostas</code>
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="font-headline text-lg md:text-xl font-bold text-[#191c1d]">
+                  Respostas da Tabela <code className="text-[#0059bb]">empreendedorismo_respostas</code>
+                </h2>
+                {isSupabaseConfigured ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Supabase Conectado
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 text-amber-600" />
+                    LocalStorage (Modo Offline / Teste)
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-gray-500 mt-0.5">
-                Registros salvos em tempo real no banco de dados Supabase da Turma 01 Fortaleza.
+                {isSupabaseConfigured
+                  ? 'Registros salvos em tempo real no banco de dados Supabase da Turma 01 Fortaleza.'
+                  : 'Para salvar no banco de dados real do Supabase, adicione as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no .env'}
               </p>
             </div>
 
-            <button
-              onClick={loadResponses}
-              disabled={isLoadingResponses}
-              className="px-4 py-2 bg-[#f8f9fa] hover:bg-gray-100 border border-gray-200 text-gray-800 text-xs font-headline font-bold rounded-xl flex items-center gap-2 transition-colors"
-            >
-              <RotateCcw className={`w-3.5 h-3.5 ${isLoadingResponses ? 'animate-spin' : ''}`} />
-              <span>Atualizar Tabela</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleSyncAllToHubSpot}
+                disabled={isSyncingAll || savedResponses.length === 0}
+                className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-xs font-headline font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
+              >
+                {isSyncingAll ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5" />
+                )}
+                <span>Sincronizar Todos com HubSpot</span>
+              </button>
+
+              <button
+                onClick={loadResponses}
+                disabled={isLoadingResponses}
+                className="px-4 py-2 bg-[#f8f9fa] hover:bg-gray-100 border border-gray-200 text-gray-800 text-xs font-headline font-bold rounded-xl flex items-center gap-2 transition-colors"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${isLoadingResponses ? 'animate-spin' : ''}`} />
+                <span>Atualizar Tabela</span>
+              </button>
+            </div>
           </div>
 
           {isLoadingResponses ? (
@@ -1177,6 +1417,15 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
                           <div className="text-[10px] text-gray-400 truncate max-w-[100px]">
                             {item.id || 'N/A'}
                           </div>
+                          {item.id?.startsWith('local-') ? (
+                            <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                              Navegador (Local)
+                            </span>
+                          ) : (
+                            <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-sans font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                              Supabase DB
+                            </span>
+                          )}
                         </td>
                         <td className="p-3">
                           <div className="font-bold text-[#191c1d]">{item.nome_completo}</div>
@@ -1240,8 +1489,8 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
                         </td>
                         <td className="p-3 text-right">
                           <button
-                            onClick={() => handleResendToHubSpot(item.id || '')}
-                            disabled={isResending || !item.id}
+                            onClick={() => handleResendToHubSpot(item)}
+                            disabled={isResending}
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-headline font-bold flex items-center gap-1 ml-auto transition-all active:scale-95 border ${
                               status === 'error'
                                 ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700 shadow-xs'
@@ -1260,6 +1509,11 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
             </div>
           )}
         </div>
+      )}
+
+      {/* SUB TAB 3: INTEGRATION DIAGNOSTIC */}
+      {activeSubTab === 'diagnostic' && (
+        <IntegrationDiagnostic />
       )}
     </div>
   );

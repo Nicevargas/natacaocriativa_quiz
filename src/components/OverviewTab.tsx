@@ -200,22 +200,28 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
 
           <div className="flex-1 flex flex-col gap-5 justify-center">
-            {cohort.profileDistribution.map((item, idx) => (
-              <div key={idx} className="flex flex-col gap-1.5">
-                <div className="flex justify-between font-headline text-xs md:text-sm">
-                  <span className="text-[#191c1d] font-bold">{item.label}</span>
-                  <span className="text-[#414754] font-semibold">
-                    {item.percentage}% ({item.count} alunos)
-                  </span>
-                </div>
-                <div className="w-full bg-[#e1e3e4] rounded-full h-3 overflow-hidden p-0.5">
-                  <div
-                    className={`${item.colorClass} h-full rounded-full transition-all duration-700`}
-                    style={{ width: `${item.percentage}%` }}
-                  ></div>
-                </div>
+            {cohort.profileDistribution.length === 0 ? (
+              <div className="text-center py-6 text-gray-400 text-xs font-body">
+                Nenhum perfil registrado ainda no banco de dados.
               </div>
-            ))}
+            ) : (
+              cohort.profileDistribution.map((item, idx) => (
+                <div key={idx} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between font-headline text-xs md:text-sm">
+                    <span className="text-[#191c1d] font-bold">{item.label}</span>
+                    <span className="text-[#414754] font-semibold">
+                      {item.percentage}% ({item.count} alunos)
+                    </span>
+                  </div>
+                  <div className="w-full bg-[#e1e3e4] rounded-full h-3 overflow-hidden p-0.5">
+                    <div
+                      className={`${item.colorClass} h-full rounded-full transition-all duration-700`}
+                      style={{ width: `${item.percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -235,17 +241,23 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </p>
 
           <div className="flex flex-wrap gap-2.5 pt-2">
-            {cohort.activityAreas.map((area, idx) => (
-              <span
-                key={idx}
-                className={`px-4 py-2.5 rounded-xl font-headline text-xs md:text-sm font-bold shadow-xs flex items-center gap-2 ${area.bgClass} ${area.textClass}`}
-              >
-                <span>{area.area}</span>
-                <span className="opacity-80 text-[11px] font-normal bg-white/60 px-2 py-0.5 rounded-md">
-                  {area.count}
+            {cohort.activityAreas.length === 0 ? (
+              <div className="w-full text-center py-6 text-gray-400 text-xs font-body">
+                Aguardando respostas de formulários no banco para categorizar áreas.
+              </div>
+            ) : (
+              cohort.activityAreas.map((area, idx) => (
+                <span
+                  key={idx}
+                  className={`px-4 py-2.5 rounded-xl font-headline text-xs md:text-sm font-bold shadow-xs flex items-center gap-2 ${area.bgClass} ${area.textClass}`}
+                >
+                  <span>{area.area}</span>
+                  <span className="opacity-80 text-[11px] font-normal bg-white/60 px-2 py-0.5 rounded-md">
+                    {area.count}
+                  </span>
                 </span>
-              </span>
-            ))}
+              ))
+            )}
           </div>
 
           <div className="mt-auto pt-4 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">

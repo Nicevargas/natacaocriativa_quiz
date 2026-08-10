@@ -74,7 +74,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
       email: email || `${name.toLowerCase().replace(/\s+/g, '')}@natacaocriativa.com`,
       phone: phone || '(85) 99000-0000',
       city,
-      cohortId: 'fortaleza-01',
+      cohortId: 'all-cohorts',
       profile,
       roleArea,
       score,
@@ -158,8 +158,17 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
       </div>
 
       {/* Student List Grid / Table */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredStudents.map((student) => {
+      {filteredStudents.length === 0 ? (
+        <div className="bg-white p-12 rounded-2xl border border-gray-100 text-center space-y-3">
+          <UserPlus className="w-10 h-10 text-gray-300 mx-auto" />
+          <h3 className="font-headline font-bold text-base text-[#191c1d]">Nenhum aluno/participante registrado ainda</h3>
+          <p className="text-xs text-gray-500 max-w-md mx-auto">
+            Os dados deste painel são 100% reais vindos do banco de dados Supabase. Assim que novos alunos enviarem o formulário ou responderem ao quiz, eles aparecerão aqui automaticamente.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredStudents.map((student) => {
           const statusBadge =
             student.quizStatus === 'Completed' ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/50">
@@ -250,6 +259,7 @@ export const StudentsTab: React.FC<StudentsTabProps> = ({
           );
         })}
       </div>
+      )}
 
       {/* Modal Cadastrar Aluno */}
       {isAddModalOpen && (

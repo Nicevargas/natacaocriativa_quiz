@@ -32,6 +32,8 @@ import {
   subscribeToRealtimeQuizResponses,
   isSupabaseConfigured,
   submitQuizResponseToSupabase,
+  fetchQuizResponsesFromSupabase,
+  fetchEmpreendedorismoResponsesFromSupabase,
 } from '../lib/supabase';
 
 interface LiveResponse {
@@ -71,56 +73,98 @@ export const LivePieDashboard: React.FC<LivePieDashboardProps> = ({
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
-  // Live aggregated counts
+  // Live aggregated counts (Start at 0 for real database data)
   const [profileCounts, setProfileCounts] = useState<Record<StudentProfile, number>>({
-    'Empreendedor em Ascensão': 28,
-    'Visionário Estratégico': 22,
-    'Gestor Operacional': 14,
-    'Personal Aquático': 18,
-    'Consultoria': 8,
+    'Empreendedor em Ascensão': 0,
+    'Visionário Estratégico': 0,
+    'Gestor Operacional': 0,
+    'Personal Aquático': 0,
+    'Consultoria': 0,
   });
 
   // Question specific options count
   const [questionCounts, setQuestionCounts] = useState<Record<number, number[]>>({
-    1: [24, 18, 12, 16],
-    2: [20, 22, 15, 13],
-    3: [18, 25, 14, 13],
-    4: [22, 19, 17, 12],
-    5: [21, 16, 18, 15],
+    1: [0, 0, 0, 0],
+    2: [0, 0, 0, 0],
+    3: [0, 0, 0, 0],
+    4: [0, 0, 0, 0],
+    5: [0, 0, 0, 0],
   });
 
-  // Stream of incoming live responses
-  const [recentResponses, setRecentResponses] = useState<LiveResponse[]>([
-    {
-      id: 'res-1',
-      studentName: 'Juliana Costa',
-      avatarInitials: 'JC',
-      profile: 'Visionário Estratégico',
-      questionId: 1,
-      optionText: 'Licenciar minha própria metodologia para outras academias',
-      timestamp: 'Agora mesmo',
-    },
-    {
-      id: 'res-2',
-      studentName: 'Carlos Silva',
-      avatarInitials: 'CS',
-      profile: 'Empreendedor em Ascensão',
-      questionId: 1,
-      optionText: 'Aumentar faturamento e escalar captação de alunos',
-      timestamp: 'Há 12 seg',
-    },
-    {
-      id: 'res-3',
-      studentName: 'Roberto Lima',
-      avatarInitials: 'RL',
-      profile: 'Personal Aquático',
-      questionId: 1,
-      optionText: 'Aumentar o valor percebido da hora/aula de personal',
-      timestamp: 'Há 30 seg',
-    },
-  ]);
+  // Stream of incoming live responses (Start empty for real database data)
+  const [recentResponses, setRecentResponses] = useState<LiveResponse[]>([]);
+  const [totalVotes, setTotalVotes] = useState<number>(0);
 
-  const [totalVotes, setTotalVotes] = useState<number>(90);
+  // Initial load of real database responses
+  useEffect(() => {
+    const loadRealData = async () => {
+      const [quizRes, empRes] = await Promise.all([
+        fetchQuizResponsesFromSupabase(),
+        fetchEmpreendedorismoResponsesFromSupabase(),
+      ]);
+
+      const counts: Record<StudentProfile, number> = {
+        'Empreendedor em Ascensão': 0,
+        'Visionário Estratégico': 0,
+        'Gestor Operacional': 0,
+        'Personal Aquático': 0,
+        'Consultoria': 0,
+      };
+
+      const responsesList: LiveResponse[] = [];
+
+      (quizRes || []).forEach((item) => {
+        const prof = (item.profile_result as StudentProfile) || 'Empreendedor em Ascensão';
+        if (counts[prof] !== undefined) counts[prof] += 1;
+        else counts['Empreendedor em Ascensão'] += 1;
+
+        const initials = (item.student_name || 'AL')
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
+
+        responsesList.push({
+          id: item.id || `q-${Math.random()}`,
+          studentName: item.student_name || 'Participante',
+          avatarInitials: initials,
+          profile: prof,
+          questionId: 1,
+          optionText: `Perfil identificado: ${prof}`,
+          timestamp: item.created_at ? new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Recente',
+        });
+      });
+
+      (empRes.data || []).forEach((emp) => {
+        const prof = (emp.area_para_empreender as StudentProfile) || 'Empreendedor em Ascensão';
+        if (counts[prof] !== undefined) counts[prof] += 1;
+
+        const initials = (emp.nome_completo || 'AL')
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
+
+        responsesList.push({
+          id: emp.id || `emp-${Math.random()}`,
+          studentName: emp.nome_completo || 'Participante',
+          avatarInitials: initials,
+          profile: prof,
+          questionId: 1,
+          optionText: `Formulário Pós: ${emp.area_atuacao_atual || prof}`,
+          timestamp: emp.created_at ? new Date(emp.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Hoje',
+        });
+      });
+
+      setProfileCounts(counts);
+      setRecentResponses(responsesList.slice(0, 10));
+      setTotalVotes(responsesList.length);
+    };
+
+    loadRealData();
+  }, []);
 
   // Supabase Realtime listener
   useEffect(() => {

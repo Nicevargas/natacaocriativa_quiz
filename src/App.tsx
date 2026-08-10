@@ -15,14 +15,167 @@ import { SettingsModal } from './components/SettingsModal';
 import { SupportModal } from './components/SupportModal';
 import { ShieldCheck, LogIn } from 'lucide-react';
 
-import { INITIAL_COHORTS, INITIAL_STUDENTS, LOGO_SIDEBAR_URL } from './data/mockData';
+import { INITIAL_COHORTS, LOGO_SIDEBAR_URL } from './data/mockData';
 import { Cohort, Student, StudentProfile } from './types';
+import {
+  fetchEmpreendedorismoResponsesFromSupabase,
+  fetchQuizResponsesFromSupabase,
+  EmpreendedorismoResposta,
+  SupabaseQuizResponse,
+} from './lib/supabase';
+
+function mapDatabaseResponsesToStudents(
+  empResponses: EmpreendedorismoResposta[],
+  quizResponses: SupabaseQuizResponse[]
+): Student[] {
+  const result: Student[] = [];
+
+  quizResponses.forEach((q) => {
+    const name = q.student_name || 'Participante';
+    const initials = name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase() || 'AL';
+
+    result.push({
+      id: q.id || `q-${Math.random()}`,
+      name,
+      avatarInitials: initials,
+      email: q.student_email || '',
+      phone: '',
+      city: 'Fortaleza / CE',
+      cohortId: q.cohort_id || 'all-cohorts',
+      profile: (q.profile_result as StudentProfile) || 'Empreendedor em Ascensão',
+      roleArea: 'Personal Aquático',
+      score: q.score || 85,
+      quizStatus: (q.status as any) || 'Completed',
+      completedAt: q.created_at ? new Date(q.created_at).toLocaleString('pt-BR') : 'Recentemente',
+      notes: q.notes || 'Resposta de Quiz do Banco de Dados',
+      answersCount: q.answers_count || 10,
+    });
+  });
+
+  empResponses.forEach((emp) => {
+    const exists = result.some((s) => s.email && s.email.toLowerCase() === emp.email?.toLowerCase());
+    if (!exists) {
+      const name = emp.nome_completo || 'Participante';
+      const initials = name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase() || 'AL';
+
+      result.push({
+        id: emp.id || `emp-${Math.random()}`,
+        name,
+        avatarInitials: initials,
+        email: emp.email || '',
+        phone: emp.telefone || '',
+        city: 'Fortaleza / CE',
+        cohortId: 'all-cohorts',
+        profile: (emp.area_para_empreender as StudentProfile) || 'Empreendedor em Ascensão',
+        roleArea: (emp.area_atuacao_atual as any) || 'Professor de Natação',
+        score: 90,
+        quizStatus: 'Completed',
+        completedAt: emp.created_at ? new Date(emp.created_at).toLocaleString('pt-BR') : 'Hoje',
+        notes: `Renda: ${emp.renda_atual || 'N/A'}. Planos: ${emp.planos_apos_pos_graduacao || 'N/A'}`,
+        answersCount: 10,
+      });
+    }
+  });
+
+  return result;
+}
+
+function calculateCohortsFromStudents(baseCohorts: Cohort[], allStudents: Student[]): Cohort[] {
+  return baseCohorts.map((cohort) => {
+    const filtered = allStudents.filter(
+      (s) => cohort.id === 'all-cohorts' || s.cohortId === cohort.id
+    );
+
+    const count = filtered.length;
+    const avgScore = count > 0 ? Math.round(filtered.reduce((acc, s) => acc + (s.score || 0), 0) / count) : 0;
+    const completedCount = filtered.filter((s) => s.quizStatus === 'Completed').length;
+    const quizCompletionRate = count > 0 ? Math.round((completedCount / count) * 100) : 0;
+
+    const profileCounts: Record<string, number> = {};
+    filtered.forEach((s) => {
+      if (s.profile) {
+        profileCounts[s.profile] = (profileCounts[s.profile] || 0) + 1;
+      }
+    });
+
+    const colors: Record<string, string> = {
+      'Empreendedor em Ascensão': 'bg-[#0059bb]',
+      'Visionário Estratégico': 'bg-[#b80049]',
+      'Gestor Operacional': 'bg-[#fabd00]',
+      'Personal Aquático': 'bg-emerald-600',
+      'Consultoria': 'bg-purple-600',
+    };
+
+    const profileDistribution = Object.entries(profileCounts).map(([label, cnt]) => ({
+      label,
+      count: cnt,
+      percentage: count > 0 ? Math.round((cnt / count) * 100) : 0,
+      colorClass: colors[label] || 'bg-blue-500',
+    }));
+
+    const areaCounts: Record<string, number> = {};
+    filtered.forEach((s) => {
+      if (s.roleArea) {
+        areaCounts[s.roleArea] = (areaCounts[s.roleArea] || 0) + 1;
+      }
+    });
+
+    const activityAreas = Object.entries(areaCounts).map(([area, cnt]) => ({
+      area,
+      count: cnt,
+      bgClass: 'bg-[#d8e2ff]',
+      textClass: 'text-[#001a41]',
+    }));
+
+    return {
+      ...cohort,
+      totalParticipants: count,
+      quizCompletionRate,
+      avgScore,
+      profileDistribution,
+      activityAreas,
+    };
+  });
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [cohorts, setCohorts] = useState<Cohort[]>(INITIAL_COHORTS);
   const [selectedCohort, setSelectedCohort] = useState<Cohort>(INITIAL_COHORTS[0]);
-  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [students, setStudents] = useState<Student[]>([]);
+
+  // Load database data
+  const loadDatabaseData = async () => {
+    const [empRes, quizRes] = await Promise.all([
+      fetchEmpreendedorismoResponsesFromSupabase(),
+      fetchQuizResponsesFromSupabase(),
+    ]);
+
+    const mappedStudents = mapDatabaseResponsesToStudents(empRes.data || [], quizRes || []);
+    setStudents(mappedStudents);
+
+    const updatedCohorts = calculateCohortsFromStudents(INITIAL_COHORTS, mappedStudents);
+    setCohorts(updatedCohorts);
+
+    const currentSelected = updatedCohorts.find((c) => c.id === selectedCohort.id) || updatedCohorts[0];
+    setSelectedCohort(currentSelected);
+  };
+
+  useEffect(() => {
+    loadDatabaseData();
+    const interval = setInterval(loadDatabaseData, 10000); // refresh every 10s
+    return () => clearInterval(interval);
+  }, []);
 
   // Admin Auth State
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
