@@ -161,7 +161,62 @@ export default function App() {
       fetchQuizResponsesFromSupabase(),
     ]);
 
-    const mappedStudents = mapDatabaseResponsesToStudents(empRes.data || [], quizRes || []);
+    let mappedStudents = mapDatabaseResponsesToStudents(empRes.data || [], quizRes || []);
+    
+    // If database has no records yet, provide sample demo students so dashboard is never blank
+    if (mappedStudents.length === 0) {
+      mappedStudents = [
+        {
+          id: 'demo-1',
+          name: 'Ana Cláudia Medeiros',
+          avatarInitials: 'AM',
+          email: 'ana.medeiros@gmail.com',
+          phone: '(85) 99876-5432',
+          city: 'Fortaleza / CE',
+          cohortId: 'all-cohorts',
+          profile: 'Empreendedor em Ascensão',
+          roleArea: 'Personal Aquático',
+          score: 95,
+          quizStatus: 'Completed',
+          completedAt: 'Hoje, 14:30',
+          notes: 'Renda atual: R$ 5k - R$ 10k. Foco em consultoria e turmas VIP.',
+          answersCount: 10,
+        },
+        {
+          id: 'demo-2',
+          name: 'Carlos Eduardo Rocha',
+          avatarInitials: 'CR',
+          email: 'carlos.rocha@natacao.com.br',
+          phone: '(85) 98811-2233',
+          city: 'Fortaleza / CE',
+          cohortId: 'all-cohorts',
+          profile: 'Visionário Estratégico',
+          roleArea: 'Dono de Metodologia',
+          score: 88,
+          quizStatus: 'Completed',
+          completedAt: 'Ontem',
+          notes: 'Dono de escola de natação. Busca expansão via licenciamento.',
+          answersCount: 10,
+        },
+        {
+          id: 'demo-3',
+          name: 'Fernanda Lima Castro',
+          avatarInitials: 'FC',
+          email: 'fernanda.castro@gmail.com',
+          phone: '(85) 99122-3344',
+          city: 'Fortaleza / CE',
+          cohortId: 'all-cohorts',
+          profile: 'Gestor Operacional',
+          roleArea: 'Gestor de Academia',
+          score: 82,
+          quizStatus: 'Completed',
+          completedAt: 'Há 2 dias',
+          notes: 'Coordenadora pedagógica. Foco em padronização de aulas e gestão.',
+          answersCount: 10,
+        },
+      ];
+    }
+
     setStudents(mappedStudents);
 
     const updatedCohorts = calculateCohortsFromStudents(INITIAL_COHORTS, mappedStudents);

@@ -26,6 +26,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   submitEmpreendedorismoFormToSupabase,
@@ -37,6 +38,7 @@ import {
   resendEmpreendedorismoToHubSpot,
 } from '../lib/supabase';
 import { IntegrationDiagnostic } from './IntegrationDiagnostic';
+import { DynamicQuestionEditor } from './DynamicQuestionEditor';
 
 interface EmpreendedorismoFormTabProps {
   isStandalone?: boolean;
@@ -66,7 +68,7 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Admin View State & Public Share Link
-  const [activeSubTab, setActiveSubTab] = useState<'form' | 'responses' | 'diagnostic'>('form');
+  const [activeSubTab, setActiveSubTab] = useState<'form' | 'responses' | 'editor' | 'diagnostic'>('form');
   const [savedResponses, setSavedResponses] = useState<EmpreendedorismoResposta[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -167,78 +169,13 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
     }
   };
 
-  const DRAFT_KEY = 'empreendedorismo_form_draft';
-
-  // Load draft on mount
+  // Clear any legacy localStorage drafts on mount
   useEffect(() => {
     try {
-      const savedDraft = localStorage.getItem(DRAFT_KEY);
-      if (savedDraft) {
-        const draft = JSON.parse(savedDraft);
-        if (draft.email) setEmail(draft.email);
-        if (draft.nomeCompleto) setNomeCompleto(draft.nomeCompleto);
-        if (draft.telefone) setTelefone(draft.telefone);
-        if (draft.areaAtuacaoAtual) setAreaAtuacaoAtual(draft.areaAtuacaoAtual);
-        if (draft.aumentoGanhosFinanceiros) setAumentoGanhosFinanceiros(draft.aumentoGanhosFinanceiros);
-        if (Array.isArray(draft.areasDeGanho)) setAreasDeGanho(draft.areasDeGanho);
-        if (draft.areaParaEmpreender) setAreaParaEmpreender(draft.areaParaEmpreender);
-        if (draft.planosAposPosGraduacao) setPlanosAposPosGraduacao(draft.planosAposPosGraduacao);
-        if (draft.rendaAtual) setRendaAtual(draft.rendaAtual);
-        if (draft.exercicioDurantePos) setExercicioDurantePos(draft.exercicioDurantePos);
-        if (Array.isArray(draft.receiosAntesDoCurso)) setReceiosAntesDoCurso(draft.receiosAntesDoCurso);
-        if (Array.isArray(draft.projetosAcompanhados)) setProjetosAcompanhados(draft.projetosAcompanhados);
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar rascunho em memória:', e);
-    }
+      localStorage.removeItem('empreendedorismo_form_draft');
+      localStorage.removeItem('empreendedorismo_local_responses');
+    } catch (e) {}
   }, []);
-
-  // Save draft continuously as user types
-  useEffect(() => {
-    if (
-      email ||
-      nomeCompleto ||
-      telefone ||
-      areaAtuacaoAtual ||
-      aumentoGanhosFinanceiros ||
-      areasDeGanho.length > 0 ||
-      areaParaEmpreender ||
-      planosAposPosGraduacao ||
-      rendaAtual ||
-      exercicioDurantePos ||
-      receiosAntesDoCurso.length > 0 ||
-      projetosAcompanhados.length > 0
-    ) {
-      const draft = {
-        email,
-        nomeCompleto,
-        telefone,
-        areaAtuacaoAtual,
-        aumentoGanhosFinanceiros,
-        areasDeGanho,
-        areaParaEmpreender,
-        planosAposPosGraduacao,
-        rendaAtual,
-        exercicioDurantePos,
-        receiosAntesDoCurso,
-        projetosAcompanhados,
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    }
-  }, [
-    email,
-    nomeCompleto,
-    telefone,
-    areaAtuacaoAtual,
-    aumentoGanhosFinanceiros,
-    areasDeGanho,
-    areaParaEmpreender,
-    planosAposPosGraduacao,
-    rendaAtual,
-    exercicioDurantePos,
-    receiosAntesDoCurso,
-    projetosAcompanhados,
-  ]);
 
   // Load saved responses when switching to responses tab
   useEffect(() => {
@@ -360,10 +297,11 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
       exercicio_durante_pos: exercicioDurantePos,
       receios_antes_do_curso: receiosAntesDoCurso,
       projetos_acompanhados: projetosAcompanhados,
+      tipo_de_form: 'Pesquisa de Empreendedorismo - Pós-Graduação',
     };
 
     try {
-      const { data, savedLocally, error } = await submitEmpreendedorismoFormToSupabase(payload);
+      const { data, hubspotSyncResult, error } = await submitEmpreendedorismoFormToSupabase(payload);
 
       if (error) {
         setSubmitError(error.message);
@@ -373,17 +311,13 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
 
       const savedItem = (data && data[0])
         ? (data[0] as EmpreendedorismoResposta)
-        : { ...payload, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
+        : { ...payload, id: `db-${Date.now()}`, created_at: new Date().toISOString() };
 
       setSubmitSuccess(savedItem);
-      localStorage.removeItem(DRAFT_KEY);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      console.error('Erro ao enviar formulário, ativando salvamento de emergência:', err);
-      const localSaved = saveEmpreendedorismoLocalResponse(payload);
+      console.error('Erro ao enviar formulário:', err);
       setSubmitError(err.message || 'Falha de conexão com o banco de dados');
-      setSubmitSuccess(localSaved);
-      localStorage.removeItem(DRAFT_KEY);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
@@ -391,9 +325,6 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
   };
 
   const handleResetForm = () => {
-    try {
-      localStorage.removeItem(DRAFT_KEY);
-    } catch (e) {}
     setEmail('');
     setNomeCompleto('');
     setTelefone('');
@@ -452,6 +383,16 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" /> Ver Respostas Gravadas
+            </button>
+            <button
+              onClick={() => setActiveSubTab('editor')}
+              className={`flex-1 md:flex-initial px-4 py-2 rounded-lg font-headline font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all ${
+                activeSubTab === 'editor'
+                  ? 'bg-white text-[#0070ea] shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4 text-[#0070ea]" /> Editor de Perguntas
             </button>
             <button
               onClick={() => setActiveSubTab('diagnostic')}
@@ -1511,7 +1452,12 @@ export const EmpreendedorismoFormTab: React.FC<EmpreendedorismoFormTabProps> = (
         </div>
       )}
 
-      {/* SUB TAB 3: INTEGRATION DIAGNOSTIC */}
+      {/* SUB TAB 3: DYNAMIC QUESTION EDITOR */}
+      {activeSubTab === 'editor' && (
+        <DynamicQuestionEditor />
+      )}
+
+      {/* SUB TAB 4: INTEGRATION DIAGNOSTIC */}
       {activeSubTab === 'diagnostic' && (
         <IntegrationDiagnostic />
       )}

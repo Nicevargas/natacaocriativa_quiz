@@ -8,9 +8,11 @@ import {
   Award,
   ArrowRight,
   RotateCcw,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { QUIZ_QUESTIONS } from '../data/mockData';
 import { StudentProfile } from '../types';
+import { DynamicQuestionEditor } from './DynamicQuestionEditor';
 
 interface QuizDataTabProps {
   onAddCompletedQuizStudent: (profileName: StudentProfile, score: number) => void;
@@ -19,7 +21,7 @@ interface QuizDataTabProps {
 export const QuizDataTab: React.FC<QuizDataTabProps> = ({
   onAddCompletedQuizStudent,
 }) => {
-  const [quizSubTab, setQuizSubTab] = useState<'simulator' | 'questions' | 'profiles'>('simulator');
+  const [quizSubTab, setQuizSubTab] = useState<'simulator' | 'questions' | 'profiles' | 'editor'>('simulator');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [quizFinished, setQuizFinished] = useState(false);
@@ -128,6 +130,18 @@ export const QuizDataTab: React.FC<QuizDataTabProps> = ({
             }`}
           >
             Perfis Diagnósticos
+          </button>
+
+          <button
+            onClick={() => setQuizSubTab('editor')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-headline font-bold transition-all flex items-center gap-1.5 ${
+              quizSubTab === 'editor'
+                ? 'bg-[#0070ea] text-white shadow-xs'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>Editor de Perguntas</span>
           </button>
         </div>
       </div>
@@ -333,6 +347,11 @@ export const QuizDataTab: React.FC<QuizDataTabProps> = ({
             </p>
           </div>
         </div>
+      )}
+
+      {/* Editor Subtab */}
+      {quizSubTab === 'editor' && (
+        <DynamicQuestionEditor />
       )}
     </div>
   );

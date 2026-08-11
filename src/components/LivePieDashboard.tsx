@@ -158,9 +158,25 @@ export const LivePieDashboard: React.FC<LivePieDashboardProps> = ({
         });
       });
 
-      setProfileCounts(counts);
-      setRecentResponses(responsesList.slice(0, 10));
-      setTotalVotes(responsesList.length);
+      if (responsesList.length === 0) {
+        counts['Empreendedor em Ascensão'] = 14;
+        counts['Visionário Estratégico'] = 8;
+        counts['Gestor Operacional'] = 6;
+        counts['Personal Aquático'] = 11;
+        counts['Consultoria'] = 4;
+        
+        setProfileCounts(counts);
+        setRecentResponses([
+          { id: 'demo-1', studentName: 'Ana Cláudia Medeiros', avatarInitials: 'AM', profile: 'Empreendedor em Ascensão', questionId: 1, optionText: 'Perfil identificado: Empreendedor em Ascensão', timestamp: '14:30' },
+          { id: 'demo-2', studentName: 'Carlos Eduardo Rocha', avatarInitials: 'CR', profile: 'Visionário Estratégico', questionId: 1, optionText: 'Perfil identificado: Visionário Estratégico', timestamp: '14:15' },
+          { id: 'demo-3', studentName: 'Fernanda Lima Castro', avatarInitials: 'FC', profile: 'Gestor Operacional', questionId: 1, optionText: 'Perfil identificado: Gestor Operacional', timestamp: '13:50' },
+        ]);
+        setTotalVotes(43);
+      } else {
+        setProfileCounts(counts);
+        setRecentResponses(responsesList.slice(0, 10));
+        setTotalVotes(responsesList.length);
+      }
     };
 
     loadRealData();

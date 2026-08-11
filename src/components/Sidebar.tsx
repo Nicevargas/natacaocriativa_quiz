@@ -10,7 +10,6 @@ import {
   PieChart,
   ClipboardList,
 } from 'lucide-react';
-import { LOGO_SIDEBAR_URL } from '../data/mockData';
 
 export type ActiveTab = 'dashboard' | 'live' | 'empreendedorismo' | 'students' | 'quiz' | 'growth';
 
@@ -31,19 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   return (
     <aside className="fixed left-0 top-16 h-[calc(100vh-4rem)] hidden md:flex flex-col p-4 w-60 bg-[#f3f4f5] z-40 border-r border-gray-200/80 justify-between">
-      <div className="flex flex-col gap-2">
-        {/* Optional Logo image inside sidebar if top header logo is simplified */}
-        <div className="px-2 py-2 mb-2 flex items-center gap-2">
-          <img
-            src={LOGO_SIDEBAR_URL}
-            alt="Natação Criativa Logo"
-            className="h-8 w-auto object-contain"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-          />
-        </div>
-
+      <div className="flex flex-col gap-2 pt-1">
         {/* Primary Navigation links */}
         <nav className="flex flex-col gap-1.5">
           <button

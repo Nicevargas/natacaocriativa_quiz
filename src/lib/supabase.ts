@@ -185,6 +185,7 @@ export interface EmpreendedorismoResposta {
   exercicio_durante_pos: string;
   receios_antes_do_curso: string[];
   projetos_acompanhados: string[];
+  tipo_de_form?: string;
   created_at?: string;
 
   // Colunas de Sincronização HubSpot
@@ -210,6 +211,7 @@ CREATE TABLE IF NOT EXISTS public.empreendedorismo_respostas (
   exercicio_durante_pos TEXT,
   receios_antes_do_curso TEXT[],
   projetos_acompanhados TEXT[],
+  tipo_de_form TEXT DEFAULT 'Pesquisa de Empreendedorismo - Pós-Graduação',
   created_at TIMESTAMPTZ DEFAULT NOW(),
 
   -- Colunas de Controle e Sincronização HubSpot
@@ -233,59 +235,50 @@ CREATE POLICY "Permitir leitura anonima" ON public.empreendedorismo_respostas FO
 
 const LOCAL_STORAGE_KEY = 'empreendedorismo_local_responses';
 
-const INITIAL_LOCAL_RESPONSES: EmpreendedorismoResposta[] = [];
-
-// Helper to get local responses
+// Helper to get local responses - Returns empty array as caching in localStorage is disabled
 export function getEmpreendedorismoLocalResponses(): EmpreendedorismoResposta[] {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([]));
-      return [];
-    }
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Erro ao ler respostas do localStorage', e);
-    return [];
-  }
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem('empreendedorismo_form_draft');
+  } catch (e) {}
+  return [];
 }
 
-// Helper to save a response locally
+// Helper to clear local responses cache
+export function clearEmpreendedorismoLocalResponses(): void {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem('empreendedorismo_form_draft');
+  } catch (e) {}
+}
+
+// Helper (no-op as localStorage saving is completely disabled)
 export function saveEmpreendedorismoLocalResponse(
   resposta: Omit<EmpreendedorismoResposta, 'id' | 'created_at'>
 ): EmpreendedorismoResposta {
-  const current = getEmpreendedorismoLocalResponses();
-  const newRecord: EmpreendedorismoResposta = {
+  return {
     ...resposta,
-    id: `local-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: `db-pending-${Date.now()}`,
     created_at: new Date().toISOString(),
   };
-  const updated = [newRecord, ...current];
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-  } catch (e) {
-    console.error('Erro ao salvar resposta no localStorage', e);
-  }
-  return newRecord;
 }
 
-// Function to submit Empreendedorismo Form to Supabase table 'empreendedorismo_respostas'
+// Function to submit Empreendedorismo Form strictly to Supabase table 'empreendedorismo_respostas' and HubSpot
 export async function submitEmpreendedorismoFormToSupabase(
   formData: Omit<EmpreendedorismoResposta, 'id' | 'created_at'>
 ) {
-  const localSaved = saveEmpreendedorismoLocalResponse(formData);
-  const client = getSupabaseClient();
-
-  // Try direct HubSpot sync
+  // Sync strictly to HubSpot
   const { syncEmpreendedorismoRecordToHubspot } = await import('./hubspot');
   const hubspotSyncResult = await syncEmpreendedorismoRecordToHubspot(formData);
 
+  const client = getSupabaseClient();
+
   if (!client) {
     return {
-      data: [localSaved],
-      savedLocally: true,
+      data: null,
+      savedLocally: false,
       hubspotSyncResult,
-      error: new Error('O Supabase não está configurado com URL/Chave no app. Clique em "Configurar Supabase" para conectar seu banco de dados.'),
+      error: new Error('O Supabase não está configurado. Conecte sua URL e Chave do Supabase para salvar no Banco de Dados.'),
     };
   }
 
@@ -303,34 +296,31 @@ export async function submitEmpreendedorismoFormToSupabase(
       .select();
 
     if (error) {
-      console.warn('Erro ao salvar no Supabase, mantendo cópia salva localmente:', error);
       return {
-        data: [localSaved],
-        savedLocally: true,
+        data: null,
+        savedLocally: false,
         hubspotSyncResult,
-        error: new Error(`Erro do Supabase (${error.code || 'RLS'}): ${error.message}`),
+        error: new Error(`Erro do Banco de Dados Supabase (${error.code || 'RLS'}): ${error.message}`),
       };
     }
 
     return { data, savedLocally: false, hubspotSyncResult, error: null };
   } catch (err: any) {
-    console.warn('Exceção no Supabase, mantendo cópia local:', err);
     return {
-      data: [localSaved],
-      savedLocally: true,
+      data: null,
+      savedLocally: false,
       hubspotSyncResult,
-      error: new Error(`Falha de conexão com o Supabase: ${err.message || 'Verifique sua URL/Chave'}`),
+      error: new Error(`Falha de conexão com o banco de dados Supabase: ${err.message || 'Verifique sua conexão'}`),
     };
   }
 }
 
-// Function to fetch all empreendedorismo responses (merging Supabase + LocalStorage)
+// Function to fetch all empreendedorismo responses strictly from Supabase
 export async function fetchEmpreendedorismoResponsesFromSupabase() {
-  const localResponses = getEmpreendedorismoLocalResponses();
   const client = getSupabaseClient();
 
   if (!client) {
-    return { data: localResponses, error: null, isLocalOnly: true };
+    return { data: [], error: new Error('Supabase não configurado.'), isLocalOnly: false };
   }
 
   try {
@@ -340,35 +330,12 @@ export async function fetchEmpreendedorismoResponsesFromSupabase() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('Supabase fetch error, fallback para local:', error);
-      return { data: localResponses, error, isLocalOnly: true };
+      return { data: [], error, isLocalOnly: false };
     }
 
-    // Merge remote and local without duplicate emails/timestamps
-    const remoteData = (data as EmpreendedorismoResposta[]) || [];
-    const combinedMap = new Map<string, EmpreendedorismoResposta>();
-
-    // Add remote items
-    remoteData.forEach((item) => {
-      const key = item.id || `${item.email}-${item.created_at}`;
-      combinedMap.set(key, item);
-    });
-
-    // Add local items if not already present
-    localResponses.forEach((item) => {
-      const key = item.id || `${item.email}-${item.created_at}`;
-      if (!combinedMap.has(key)) {
-        combinedMap.set(key, item);
-      }
-    });
-
-    const merged = Array.from(combinedMap.values()).sort(
-      (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-    );
-
-    return { data: merged, error: null, isLocalOnly: false };
+    return { data: (data as EmpreendedorismoResposta[]) || [], error: null, isLocalOnly: false };
   } catch (err: any) {
-    return { data: localResponses, error: err, isLocalOnly: true };
+    return { data: [], error: err, isLocalOnly: false };
   }
 }
 

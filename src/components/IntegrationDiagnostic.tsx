@@ -20,6 +20,7 @@ import {
   getSupabaseClient,
   fetchEmpreendedorismoResponsesFromSupabase,
   resendEmpreendedorismoToHubSpot,
+  clearEmpreendedorismoLocalResponses,
   EmpreendedorismoResposta,
   testSupabaseConnection
 } from '../lib/supabase';
@@ -241,14 +242,28 @@ export function IntegrationDiagnostic() {
           </p>
         </div>
 
-        <button
-          onClick={runDiagnostic}
-          disabled={isCheckingConnections || isLoadingRecords}
-          className="px-4 py-2.5 bg-gray-900 hover:bg-black disabled:opacity-50 text-white font-headline font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-xs"
-        >
-          <RefreshCw className={`w-4 h-4 ${(isCheckingConnections || isLoadingRecords) ? 'animate-spin' : ''}`} />
-          <span>Executar Diagnóstico Completo</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (confirm('Deseja limpar os registros locais em cache? Os registros salvos no banco de dados Supabase continuarão salvos.')) {
+                clearEmpreendedorismoLocalResponses();
+                loadRecords();
+              }
+            }}
+            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-headline font-bold text-xs rounded-xl transition-all"
+            title="Limpar apenas duplicatas ou cópias salvas no navegador local"
+          >
+            Limpar Cache Local
+          </button>
+          <button
+            onClick={runDiagnostic}
+            disabled={isCheckingConnections || isLoadingRecords}
+            className="px-4 py-2.5 bg-gray-900 hover:bg-black disabled:opacity-50 text-white font-headline font-bold text-xs rounded-xl flex items-center gap-2 transition-all shadow-xs"
+          >
+            <RefreshCw className={`w-4 h-4 ${(isCheckingConnections || isLoadingRecords) ? 'animate-spin' : ''}`} />
+            <span>Executar Diagnóstico Completo</span>
+          </button>
+        </div>
       </div>
 
       {/* CONNECTION STATUS CARDS */}
